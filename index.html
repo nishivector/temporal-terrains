@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temporal Terrains</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            overflow: hidden;
+            background: #000;
+            font-family: 'Orbitron', monospace;
+        }
+        
+        #game-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #ui-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        #title-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a0a12 0%, #1a0a2e 50%, #0a1a1a 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            transition: opacity 0.8s ease;
+        }
+        
+        #title-screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        #title-screen h1 {
+            font-size: 4rem;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 
+                0 0 10px #0ff,
+                0 0 20px #0ff,
+                0 0 40px #0ff,
+                0 0 80px #0ff;
+            margin-bottom: 1rem;
+            letter-spacing: 0.3em;
+            animation: titlePulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes titlePulse {
+            0%, 100% { text-shadow: 0 0 10px #0ff, 0 0 20px #0ff, 0 0 40px #0ff; }
+            50% { text-shadow: 0 0 20px #0ff, 0 0 40px #0ff, 0 0 80px #0ff, 0 0 120px #0ff; }
+        }
+        
+        #title-screen .subtitle {
+            font-size: 1.2rem;
+            color: #8af;
+            margin-bottom: 3rem;
+            letter-spacing: 0.5em;
+        }
+        
+        #title-screen .story {
+            max-width: 600px;
+            text-align: center;
+            color: #aaa;
+            font-size: 0.9rem;
+            line-height: 1.8;
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        #start-btn {
+            padding: 1rem 3rem;
+            font-family: 'Orbitron', monospace;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #0ff;
+            background: transparent;
+            border: 2px solid #0ff;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: all 0.3s ease;
+            letter-spacing: 0.2em;
+        }
+        
+        #start-btn:hover {
+            background: #0ff;
+            color: #000;
+            box-shadow: 0 0 30px #0ff;
+        }
+        
+        #hud {
+            position: fixed;
+            bottom: 30px;
+            left: 30px;
+            color: #fff;
+            font-size: 1rem;
+            text-shadow: 0 0 10px rgba(0,0,0,0.8);
+            pointer-events: none;
+        }
+        
+        #hud .time-layer {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            margin-right: 10px;
+            border: 2px solid;
+            transition: all 0.3s ease;
+            opacity: 0.4;
+        }
+        
+        #hud .time-layer.active {
+            opacity: 1;
+        }
+        
+        #hud .time-layer.past { border-color: #c96; color: #c96; }
+        #hud .time-layer.present { border-color: #8cf; color: #8cf; }
+        #hud .time-layer.future { border-color: #f0f; color: #f0f; }
+        
+        #hud .time-layer.active.past { 
+            background: rgba(204, 153, 102, 0.3); 
+            box-shadow: 0 0 20px rgba(204, 153, 102, 0.5);
+        }
+        #hud .time-layer.active.present { 
+            background: rgba(136, 204, 255, 0.3); 
+            box-shadow: 0 0 20px rgba(136, 204, 255, 0.5);
+        }
+        #hud .time-layer.active.future { 
+            background: rgba(255, 0, 255, 0.3); 
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+        }
+        
+        #shards-counter {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            color: #ff0;
+            font-size: 1.2rem;
+            text-shadow: 0 0 10px #ff0;
+            pointer-events: none;
+        }
+        
+        #crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+        }
+        
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255,255,255,0.7);
+        }
+        
+        #crosshair::before {
+            width: 2px;
+            height: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        #crosshair::after {
+            width: 100%;
+            height: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        #win-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 300;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1s ease;
+        }
+        
+        #win-screen.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        #win-screen h1 {
+            font-size: 3rem;
+            color: #0ff;
+            text-shadow: 0 0 30px #0ff;
+            margin-bottom: 1rem;
+        }
+        
+        #win-screen p {
+            color: #8af;
+            font-size: 1.2rem;
+        }
+        
+        #instructions {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            color: rgba(255,255,255,0.5);
+            font-size: 0.7rem;
+            text-align: right;
+            pointer-events: none;
+        }
+        
+        #damage-flash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #f00;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.1s ease;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    
+    <div id="title-screen">
+        <h1>TEMPORAL TERRAINS</h1>
+        <div class="subtitle">A TIME-FRACTURED ODYSSEY</div>
+        <div class="story">
+            You are Dr. Elara Vance.<br><br>
+            The facility has fractured across three timelines.<br>
+            Use your Harmonic Deck to navigate Past, Present, and Future.<br>
+            Collect Temporal Shards. Avoid the Null in the Future.<br>
+            Find the Paradox Core to restore time.
+        </div>
+        <button id="start-btn">ENTER THE FRACTURE</button>
+    </div>
+    
+    <div id="ui-overlay">
+        <div id="hud">
+            <span class="time-layer past" id="layer-past">[1] PAST</span>
+            <span class="time-layer present active" id="layer-present">[2] PRESENT</span>
+            <span class="time-layer future" id="layer-future">[3] FUTURE</span>
+        </div>
+        <div id="shards-counter">◆ SHARDS: <span id="shards-count">0</span>/10</div>
+        <div id="crosshair"></div>
+        <div id="instructions">
+            WASD - Move | MOUSE - Look<br>
+            1/2/3 - Switch Time Layer<br>
+            COLLECT 10 SHARDS TO UNLOCK CORE
+        </div>
+    </div>
+    
+    <div id="win-screen">
+        <h1>PARADOX RESOLVED</h1>
+        <p>Time has been restored. Thank you, Dr. Vance.</p>
+    </div>
+    
+    <div id="damage-flash"></div>
+
+    <script type="module">
+        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.module.js';
+        import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.183.0/examples/jsm/controls/PointerLockControls.js';
+        
+        const TONE_URL = 'https://cdn.jsdelivr.net/npm/tone@15.1.22/build/esm/index.min.js';
+        
+        // Game State
+        const state = {
+            currentLayer: 'present',
+            shards: 0,
+            totalShards: 10,
+            health: 100,
+            isGameOver: false,
+            hasWon: false,
+            audioInitialized: false
+        };
+        
+        // Scene Setup
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x0a0a1a, 0.015);
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 2, 0);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        document.getElementById('game-container').appendChild(renderer.domElement);
+        
+        // Controls
+        const controls = new PointerLockControls(camera, document.body);
+        
+        // Lighting (minimal - use emissive materials)
+        const ambientLight = new THREE.AmbientLight(0x222233, 0.3);
+        scene.add(ambientLight);
+        
+        const pointLight1 = new THREE.PointLight(0x4488ff, 1, 50);
+        pointLight1.position.set(10, 10, 10);
+        scene.add(pointLight1);
+        
+        const pointLight2 = new THREE.PointLight(0xff44aa, 0.5, 30);
+        pointLight2.position.set(-10, 5, -10);
+        scene.add(pointLight2);
+        
+        // Materials for each time layer
+        const materials = {
+            past: {
+                platform: new THREE.MeshStandardMaterial({
+                    color: 0x8b7355,
+                    emissive: 0x3d2a1a,
+                    emissiveIntensity: 0.3,
+                    roughness: 0.9,
+                    metalness: 0.1,
+                    transparent: true,
+                    opacity: 0.85
+                }),
+                ambient: 0x4a3a2a,
+                fog: 0x2a1a0a
+            },
+            present: {
+                platform: new THREE.MeshStandardMaterial({
+                    color: 0x4a5568,
+                    emissive: 0x1a2530,
+                    emissiveIntensity: 0.2,
+                    roughness: 0.5,
+                    metalness: 0.3
+                }),
+                ambient: 0x334455,
+                fog: 0x1a2530
+            },
+            future: {
+                platform: new THREE.MeshStandardMaterial({
+                    color: 0x2a0a2a,
+                    emissive: 0xff00ff,
+                    emissiveIntensity: 0.4,
+                    roughness: 0.3,
+                    metalness: 0.8,
+                    transparent: true,
+                    opacity: 0.9
+                }),
+                ambient: 0x2a0a2a,
+                fog: 0x1a0a1a
+            }
+        };
+        
+        // Platform storage
+        const platforms = { past: [], present: [], future: [] };
+        const shards = [];
+        let nullEntity = null;
+        let paradoxCore = null;
+        
+        // Player physics
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+        const playerParams = {
+            speed: 8,
+            jumpForce: 12,
+            gravity: 30,
+            isGrounded: false,
+            height: 1.8
+        };
+        
+        let moveForward = false;
+        let moveBackward = false;
+        let moveLeft = false;
+        let moveRight = false;
+        let canJump = false;
+        
+        // Generate level
+        function generatePlatform(x, y, z, width, height, depth, layer) {
+            const geometry = new THREE.BoxGeometry(width, height, depth);
+            const material = materials[layer].platform.clone();
+            const platform = new THREE.Mesh(geometry, material);
+            platform.position.set(x, y, z);
+            platform.userData.layer = layer;
+            platform.userData.isPlatform = true;
+            scene.add(platform);
+            platforms[layer].push(platform);
+            return platform;
+        }
+        
+        function generateLevel() {
+            // Starting platform
+            generatePlatform(0, -1, 0, 10, 1, 10, 'present');
+            
+            // Past layer platforms (ghostly ruins)
+            const pastPositions = [
+                [-8, 0, -15], [5, 1.5, -20], [-12, 3, -30], [8, 4.5, -40],
+                [-5, 6, -50], [12, 7.5, -60], [-15, 9, -70], [0, 10.5, -80],
+                [-8, 12, -90], [10, 13.5, -100], [-3, 15, -110], [6, 16.5, -120]
+            ];
+            pastPositions.forEach(([x, y, z]) => {
+                generatePlatform(x, y, z, 4 + Math.random() * 2, 0.5, 4 + Math.random() * 2, 'past');
+            });
+            
+            // Present layer platforms (solid structure)
+            const presentPositions = [
+                [0, 1, -12], [-10, 2.5, -25], [8, 4, -35], [-6, 5.5, -48],
+                [12, 7, -58], [-12, 8.5, -68], [4, 10, -78], [-8, 11.5, -88],
+                [14, 13, -98], [-4, 14.5, -108], [8, 16, -118]
+            ];
+            presentPositions.forEach(([x, y, z]) => {
+                generatePlatform(x, y, z, 5, 0.8, 5, 'present');
+            });
+            
+            // Future layer platforms (glitched/neon)
+            const futurePositions = [
+                [4, 0.5, -18], [-6, 2, -28], [10, 3.5, -38], [-4, 5, -52],
+                [6, 6.5, -62], [-10, 8, -72], [2, 9.5, -82], [-8, 11, -92],
+                [12, 12.5, -102], [0, 14, -112], [-6, 15.5, -122]
+            ];
+            futurePositions.forEach(([x, y, z]) => {
+                generatePlatform(x, y, z, 3 + Math.random() * 2, 0.4, 3 + Math.random() * 2, 'future');
+            });
+            
+            // Generate Temporal Shards
+            const allPlatforms = [...platforms.past, ...platforms.present, ...platforms.future];
+            for (let i = 0; i < state.totalShards; i++) {
+                const platform = allPlatforms[Math.floor(Math.random() * allPlatforms.length)];
+                const shard = createShard(
+                    platform.position.x + (Math.random() - 0.5) * 3,
+                    platform.position.y + 1.5,
+                    platform.position.z + (Math.random() - 0.5) * 3
+                );
+                shards.push(shard);
+            }
+            
+            // Create Null Entity (Future layer)
+            createNullEntity();
+            
+            // Create Paradox Core (at the end)
+            createParadoxCore(0, 18, -130);
+        }
+        
+        function createShard(x, y, z) {
+            const geometry = new THREE.OctahedronGeometry(0.3, 0);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0xffff00,
+                emissive: 0xffaa00,
+                emissiveIntensity: 1,
+                roughness: 0.2,
+                metalness: 0.8
+            });
+            const shard = new THREE.Mesh(geometry, material);
+            shard.position.set(x, y, z);
+            shard.userData.isShard = true;
+            shard.userData.collected = false;
+            scene.add(shard);
+            
+            // Add point light to shard
+            const light = new THREE.PointLight(0xffaa00, 0.5, 5);
+            shard.add(light);
+            
+            return shard;
+        }
+        
+        function createNullEntity() {
+            const geometry = new THREE.SphereGeometry(0.8, 16, 16);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x000000,
+                emissive: 0x330000,
+                emissiveIntensity: 2,
+                roughness: 0.1,
+                metalness: 1,
+                transparent: true,
+                opacity: 0.9
+            });
+            nullEntity = new THREE.Mesh(geometry, material);
+            nullEntity.position.set(5, 2, -50);
+            nullEntity.userData.isNull = true;
+            nullEntity.userData.speed = 4;
+            nullEntity.userData.direction = new THREE.Vector3(1, 0, 0);
+            scene.add(nullEntity);
+            
+            // Null aura
+            const auraGeometry = new THREE.SphereGeometry(1.5, 16, 16);
+            const auraMaterial = new THREE.MeshBasicMaterial({
+                color: 0xff0000,
+                transparent: true,
+                opacity: 0.2,
+                side: THREE.BackSide
+            });
+            const aura = new THREE.Mesh(auraGeometry, auraMaterial);
+            nullEntity.add(aura);
+            
+            // Null light
+            const nullLight = new THREE.PointLight(0xff0000, 1, 15);
+            nullEntity.add(nullLight);
+        }
+        
+        function createParadoxCore(x, y, z) {
+            const group = new THREE.Group();
+            
+            // Core crystal
+            const geometry = new THREE.IcosahedronGeometry(0.8, 1);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x00ffff,
+                emissive: 0x00ffff,
+                emissiveIntensity: 2,
+                roughness: 0.1,
+                metalness: 1,
+                transparent: true,
+                opacity: 0.8
+            });
+            const core = new THREE.Mesh(geometry, material);
+            group.add(core);
+            
+            // Outer ring
+            const ringGeometry = new THREE.TorusGeometry(1.5, 0.1, 8, 32);
+            const ringMaterial = new THREE.MeshStandardMaterial({
+                color: 0xff00ff,
+                emissive: 0xff00ff,
+                emissiveIntensity: 1
+            });
+            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+            group.add(ring);
+            
+            group.position.set(x, y, z);
+            group.userData.isCore = true;
+            group.userData.unlocked = false;
+            scene.add(group);
+            
+            paradoxCore = group;
+            
+            // Core light
+            const coreLight = new THREE.PointLight(0x00ffff, 2, 20);
+            group.add(coreLight);
+        }
+        
+        // Time layer switching
+        function setTimeLayer(layer) {
+            state.currentLayer = layer;
+            
+            // Update HUD
+            document.querySelectorAll('.time-layer').forEach(el => el.classList.remove('active'));
+            document.getElementById(`layer-${layer}`).classList.add('active');
+            
+            // Update scene
+            scene.fog.color.setHex(materials[layer].fog);
+            ambientLight.color.setHex(materials[layer].ambient);
+            
+            // Show/hide platforms
+            Object.keys(platforms).forEach(key => {
+                platforms[key].forEach(platform => {
+                    platform.visible = (key === layer);
+                });
+            });
+            
+            // Update fog density based on layer
+            if (layer === 'past') {
+                scene.fog.density = 0.025;
+                renderer.toneMappingExposure = 0.8;
+            } else if (layer === 'present') {
+                scene.fog.density = 0.015;
+                renderer.toneMappingExposure = 1.2;
+            } else {
+                scene.fog.density = 0.02;
+                renderer.toneMappingExposure = 1.5;
+            }
+            
+            // Play sound
+            if (state.audioInitialized) {
+                playLayerSound(layer);
+            }
+        }
+        
+        // Audio System
+        let tone = null;
+        
+        async function initAudio() {
+            if (state.audioInitialized) return;
+            
+            try {
+                tone = await import(TONE_URL);
+                await tone.start();
+                
+                // Create instruments for each layer
+                window.synths = {
+                    past: new tone.PolySynth(tone.Synth, {
+                        oscillator: { type: 'sine' },
+                        envelope: { attack: 0.3, decay: 0.5, sustain: 0.3, release: 1 }
+                    }).toDestination(),
+                    
+                    present: new tone.PolySynth(tone.Synth, {
+                        oscillator: { type: 'triangle' },
+                        envelope: { attack: 0.1, decay: 0.3, sustain: 0.5, release: 0.5 }
+                    }).toDestination(),
+                    
+                    future: new tone.PolySynth(tone.Synth, {
+                        oscillator: { type: 'square' },
+                        envelope: { attack: 0.05, decay: 0.2, sustain: 0.3, release: 0.3 }
+                    }).toDestination()
+                };
+                
+                // Add reverb
+                const reverb = new tone.Reverb(2).toDestination();
+                window.synths.past.connect(reverb);
+                window.synths.present.connect(reverb);
+                window.synths.future.connect(reverb);
+                
+                // Core sound
+                window.coreSynth = new tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.5, decay: 1, sustain: 0.5, release: 2 }
+                }).toDestination();
+                
+                const coreReverb = new tone.Reverb(4).toDestination();
+                window.coreSynth.connect(coreReverb);
+                
+                // Null sound
+                window.nullOsc = new tone.Oscillator('sawtooth', 'C2').toDestination();
+                window.nullOsc.volume.value = -20;
+                window.nullOsc.start();
+                
+                state.audioInitialized = true;
+            } catch (e) {
+                console.warn('Audio initialization failed:', e);
+            }
+        }
+        
+        function playLayerSound(layer) {
+            if (!window.synths) return;
+            
+            const notes = {
+                past: ['C3', 'E3', 'G3'],
+                present: ['C4', 'E4', 'G4'],
+                future: ['C5', 'E5', 'G5']
+            };
+            
+            window.synths[layer].triggerAttackRelease(notes[layer], '8n');
+        }
+        
+        function playCollectSound() {
+            if (!window.synths) return;
+            window.synths.present.triggerAttackRelease('C6', '16n');
+            setTimeout(() => window.synths.future.triggerAttackRelease('E6', '16n'), 50);
+        }
+        
+        function playHurtSound() {
+            if (!window.synths) return;
+            window.synths.future.triggerAttackRelease('C2', '8n', 0, 0.5);
+        }
+        
+        function playCoreSound() {
+            if (!window.coreSynth) return;
+            window.coreSynth.triggerAttackRelease('C4', '2n');
+        }
+        
+        // Input handling
+        const onKeyDown = (event) => {
+            switch (event.code) {
+                case 'KeyW': moveForward = true; break;
+                case 'KeyS': moveBackward = true; break;
+                case 'KeyA': moveLeft = true; break;
+                case 'KeyD': moveRight = true; break;
+                case 'Space':
+                    if (canJump) {
+                        velocity.y = playerParams.jumpForce;
+                        canJump = false;
+                    }
+                    break;
+                case 'Digit1':
+                    setTimeLayer('past');
+                    if (state.audioInitialized) {
+                        window.synths.past.triggerAttackRelease('C3', '8n');
+                    }
+                    break;
+                case 'Digit2':
+                    setTimeLayer('present');
+                    if (state.audioInitialized) {
+                        window.synths.present.triggerAttackRelease('E4', '8n');
+                    }
+                    break;
+                case 'Digit3':
+                    setTimeLayer('future');
+                    if (state.audioInitialized) {
+                        window.synths.future.triggerAttackRelease('G5', '8n');
+                    }
+                    break;
+            }
+        };
+        
+        const onKeyUp = (event) => {
+            switch (event.code) {
+                case 'KeyW': moveForward = false; break;
+                case 'KeyS': moveBackward = false; break;
+                case 'KeyA': moveLeft = false; break;
+                case 'KeyD': moveRight = false; break;
+            }
+        };
+        
+        document.addEventListener('keydown', onKeyDown);
+        document.addEventListener('keyup', onKeyUp);
+        
+        // Collision detection
+        function checkPlatformCollision(position) {
+            const playerBox = new THREE.Box3(
+                new THREE.Vector3(position.x - 0.4, position.y, position.z - 0.4),
+                new THREE.Vector3(position.x + 0.4, position.y + playerParams.height, position.z + 0.4)
+            );
+            
+            const currentPlatforms = platforms[state.currentLayer];
+            
+            for (const platform of currentPlatforms) {
+                const platformBox = new THREE.Box3().setFromObject(platform);
+                
+                if (playerBox.intersectsBox(platformBox)) {
+                    // Check if landing on top
+                    const playerBottom = position.y;
+                    const platformTop = platformBox.max.y;
+                    const platformBottom = platformBox.min.y;
+                    
+                    if (playerBottom >= platformTop - 0.5 && velocity.y <= 0) {
+                        return { 
+                            collided: true, 
+                            y: platformBox.max.y,
+                            isGround: true
+                        };
+                    }
+                }
+            }
+            
+            return { collided: false };
+        }
+        
+        // Null Entity AI
+        function updateNullEntity(delta) {
+            if (!nullEntity || state.currentLayer !== 'future') {
+                if (nullEntity) nullEntity.visible = false;
+                return;
+            }
+            
+            nullEntity.visible = true;
+            
+            // Move toward player
+            const direction = new THREE.Vector3();
+            direction.subVectors(camera.position, nullEntity.position).normalize();
+            direction.y = 0;
+            
+            nullEntity.position.add(direction.multiplyScalar(nullEntity.userData.speed * delta));
+            
+            // Float up and down
+            nullEntity.position.y = 2 + Math.sin(Date.now() * 0.003) * 0.5;
+            
+            // Check collision with player
+            const dist = nullEntity.position.distanceTo(camera.position);
+            if (dist < 1.5) {
+                takeDamage(25);
+            }
+            
+            // Rotate
+            nullEntity.rotation.y += delta * 2;
+            nullEntity.rotation.x += delta;
+        }
+        
+        function takeDamage(amount) {
+            state.health -= amount;
+            playHurtSound();
+            
+            // Flash effect
+            const flash = document.getElementById('damage-flash');
+            flash.style.opacity = '0.5';
+            setTimeout(() => flash.style.opacity = '0', 100);
+            
+            // Knockback
+            velocity.y = 5;
+            
+            if (state.health <= 0) {
+                // Respawn
+                state.health = 100;
+                camera.position.set(0, 2, 0);
+                velocity.set(0, 0, 0);
+            }
+        }
+        
+        // Collectibles
+        function updateCollectibles() {
+            shards.forEach(shard => {
+                if (shard.userData.collected) return;
+                
+                shard.visible = shard.parent ? true : true;
+                shard.rotation.y += 0.02;
+                shard.rotation.x += 0.01;
+                
+                const dist = camera.position.distanceTo(shard.position);
+                if (dist < 1.5) {
+                    shard.userData.collected = true;
+                    scene.remove(shard);
+                    state.shards++;
+                    document.getElementById('shards-count').textContent = state.shards;
+                    playCollectSound();
+                    
+                    // Unlock core if all shards collected
+                    if (state.shards >= state.totalShards && paradoxCore) {
+                        paradoxCore.userData.unlocked = true;
+                    }
+                }
+            });
+        }
+        
+        // Paradox Core
+        function updateParadoxCore(delta) {
+            if (!paradoxCore) return;
+            
+            paradoxCore.visible = paradoxCore.userData.unlocked || state.shards >= state.totalShards;
+            
+            if (!paradoxCore.visible) return;
+            
+            // Rotate
+            paradoxCore.rotation.y += delta;
+            paradoxCore.children[0].rotation.x += delta * 2;
+            paradoxCore.children[1].rotation.z += delta * 0.5;
+            
+            // Pulse
+            const scale = 1 + Math.sin(Date.now() * 0.005) * 0.1;
+            paradoxCore.scale.set(scale, scale, scale);
+            
+            // Check collection
+            const dist = camera.position.distanceTo(paradoxCore.position);
+            if (dist < 2 && state.shards >= state.totalShards && !state.hasWon) {
+                winGame();
+            }
+        }
+        
+        function winGame() {
+            state.hasWon = true;
+            playCoreSound();
+            document.getElementById('win-screen').classList.add('visible');
+            
+            if (controls.isLocked) {
+                controls.unlock();
+            }
+        }
+        
+        // Animation loop
+        let prevTime = performance.now();
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const time = performance.now();
+            const delta = (time - prevTime) / 1000;
+            prevTime = time;
+            
+            if (state.isGameOver || state.hasWon) {
+                renderer.render(scene, camera);
+                return;
+            }
+            
+            if (controls.isLocked) {
+                // Apply gravity
+                velocity.y -= playerParams.gravity * delta;
+                
+                // Movement
+                direction.z = Number(moveForward) - Number(moveBackward);
+                direction.x = Number(moveRight) - Number(moveLeft);
+                direction.normalize();
+                
+                if (moveForward || moveBackward) {
+                    velocity.z = -direction.z * playerParams.speed;
+                } else {
+                    velocity.z = 0;
+                }
+                
+                if (moveLeft || moveRight) {
+                    velocity.x = -direction.x * playerParams.speed;
+                } else {
+                    velocity.x = 0;
+                }
+                
+                // Apply movement
+                controls.moveRight(-velocity.x * delta);
+                controls.moveForward(-velocity.z * delta);
+                
+                // Vertical movement
+                camera.position.y += velocity.y * delta;
+                
+                // Platform collision
+                const collision = checkPlatformCollision(camera.position);
+                
+                if (collision.collided && velocity.y <= 0) {
+                    camera.position.y = collision.y;
+                    velocity.y = 0;
+                    canJump = true;
+                }
+                
+                // Fall reset
+                if (camera.position.y < -20) {
+                    camera.position.set(0, 2, 0);
+                    velocity.set(0, 0, 0);
+                }
+                
+                // Update game objects
+                updateNullEntity(delta);
+                updateCollectibles();
+                updateParadoxCore(delta);
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Start game
+        document.getElementById('start-btn').addEventListener('click', async () => {
+            document.getElementById('title-screen').classList.add('hidden');
+            await initAudio();
+            controls.lock();
+        });
+        
+        controls.addEventListener('lock', () => {
+            document.getElementById('ui-overlay').style.display = 'block';
+        });
+        
+        controls.addEventListener('unlock', () => {
+            if (!state.hasWon) {
+                document.getElementById('ui-overlay').style.display = 'none';
+            }
+        });
+        
+        // Window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Initialize
+        generateLevel();
+        setTimeLayer('present');
+        animate();
+    </script>
+</body>
+</html>
