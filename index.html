@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.0/examples/jsm/"
+      }
+    }
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Temporal Terrains</title>
@@ -292,8 +300,8 @@
     <div id="damage-flash"></div>
 
     <script type="module">
-        import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.module.js';
-        import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.183.0/examples/jsm/controls/PointerLockControls.js';
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
         
         const TONE_URL = 'https://cdn.jsdelivr.net/npm/tone@15.1.22/build/esm/index.min.js';
         
